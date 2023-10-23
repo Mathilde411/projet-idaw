@@ -4,7 +4,7 @@ namespace App;
 use App\Config\Config;
 use App\Facade\Facade;
 use App\Services\ServiceProvider;
-use App\Util\ReflectionUtil;
+use App\Reflection\ReflectionUtil;
 use Closure;
 use ReflectionClass;
 use ReflectionException;
@@ -58,18 +58,9 @@ class Application
         if(!isset($concrete))
             $concrete = $abstract;
 
-        if($concrete instanceof Closure) {
-            $builder = $concrete;
-            $parameters = ReflectionUtil::getClosureArguments($concrete);
-        } else {
-            $builder = ReflectionUtil::getObjectBuildingClosure($concrete);
-            $parameters = ReflectionUtil::getClosureArguments(ReflectionUtil::getConstructor($concrete));
-        }
-
         $this->bindings[$abstract] = [
-            'builder' => $builder,
-            'shared' => $shared,
-            'parameters' => $parameters
+            'callParam' => ReflectionUtil::getReflectiveCallParameters($concrete),
+            'shared' => $shared
         ];
     }
 
@@ -88,12 +79,42 @@ class Application
 
     public function instance(string $abstract, mixed $instance = null) : void {
         $this->bindings[$abstract] = [
-            'builder' => null,
-            'shared' => true,
-            'parameters' => []
+            'callParam' => null,
+            'shared' => true
         ];
 
         $this->sharedInstances[$abstract] = $instance ?? $this->make($abstract);
+    }
+
+    public function makeInjectedCall(array $reflectiveCallParams, array $args = [], mixed $target = null) {
+        $fnArgs = [];
+        foreach($reflectiveCallParams['parameters'] as $name => $opt) {
+            if(isset($args[$name])) {
+                $fnArgs[] = $args[$name];
+            } elseif ($this->isBound($opt['class'])) {
+                $fnArgs[] = $this->make($opt['class']);
+            } elseif ($opt['optional']) {
+                break;
+            } else {
+                $fnArgs[] = null;
+            }
+        }
+
+        if(isset($target) and in_array($reflectiveCallParams['type'], ['static', 'method'])) {
+            $builder = [$target, $reflectiveCallParams['builder'][1]];
+        } elseif ($reflectiveCallParams['type'] == 'method') {
+            $obj = $this->makeImmediateInjectedCall($reflectiveCallParams['builder'][0]);
+            $builder = [$obj, $reflectiveCallParams['builder'][1]];
+        } else {
+            $builder = $reflectiveCallParams['builder'];
+        }
+
+        return call_user_func_array($builder, $fnArgs);
+    }
+
+    public function makeImmediateInjectedCall(Closure|string|array $closure, array $args = [], mixed $target = null) {
+        $constructorCallParams = ReflectionUtil::getReflectiveCallParameters($closure);
+        return $this->makeInjectedCall($constructorCallParams, $args, $target);
     }
 
     public function make(string $abstract, array $args = []) : mixed
@@ -106,29 +127,14 @@ class Application
         if($binding['shared'] and $this->sharedInstanceExists($abstract))
             return $this->sharedInstances[$abstract];
 
-        $fnArgs = [];
-        foreach($binding['parameters'] as $name => $opt) {
-            if(isset($args[$name])) {
-                $fnArgs[] = $args[$name];
-            } elseif ($this->isBound($opt['class'])) {
-                $fnArgs[] = $this->make($opt['class']);
-            } elseif ($opt['optional']) {
-                break;
-            } else {
-                $fnArgs[] = null;
-            }
-        }
+        $res = $this->makeInjectedCall($binding['callParam'], $args);
 
-        $res = call_user_func_array($binding['builder'], $fnArgs);
         if($binding['shared'])
             $this->sharedInstances[$abstract] = $res;
 
         return $res;
     }
 
-    /**
-     * @throws ReflectionException
-     */
     private function setupFirstBindings() {
         static::setInstance($this);
         $this->instance('app', $this);

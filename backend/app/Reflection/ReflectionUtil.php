@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Util;
+namespace App\Reflection;
 
 use Closure;
 use ReflectionClass;
@@ -12,9 +12,7 @@ use ReflectionParameter;
 
 class ReflectionUtil
 {
-    /**
-     * @throws ReflectionException
-     */
+
     public static function getConstructor(string $class) : ?ReflectionMethod
     {
         $rClass = new ReflectionClass($class);
@@ -26,9 +24,6 @@ class ReflectionUtil
     }
 
 
-    /**
-     * @throws ReflectionException
-     */
     public static function getClosureArguments(Closure|ReflectionMethod|null $closure) : array {
         if(!isset($closure))
             return [];
@@ -57,4 +52,35 @@ class ReflectionUtil
             return $rClass->newInstanceArgs($args);
         };
     }
+
+    private static function extractMethod(array $closure): ReflectionMethod
+    {
+        $rClass = new ReflectionClass($closure[0]);
+        return $rClass->getMethod($closure[1]);
+    }
+
+    public static function getReflectiveCallParameters(Closure|string|array $closure) {
+        if($closure instanceof Closure) {
+            $builder = $closure;
+            $type = 'function';
+            $parameters = static::getClosureArguments($closure);
+        } elseif(is_array($closure)) {
+            $builder = $closure;
+            $method = static::extractMethod($closure);
+            $type = $method->isStatic() ? 'static' : 'method';
+            $parameters = static::getClosureArguments($method);
+        } else {
+            $builder = static::getObjectBuildingClosure($closure);
+            $type = 'constructor';
+            $parameters = static::getClosureArguments(static::getConstructor($closure));
+        }
+
+        return [
+            'builder' => $builder,
+            'type' => $type,
+            'parameters' => $parameters
+        ];
+    }
+
+
 }
