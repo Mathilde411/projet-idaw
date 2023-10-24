@@ -29,6 +29,10 @@ class Facade
         return static::resolveBinding(static::getFacadeBinding());
     }
 
+    protected static function configureRoot($root) {
+        return $root;
+    }
+
     public static function __callStatic(string $name, array $arguments)
     {
         $root = static::getFacadeRoot();
@@ -36,7 +40,7 @@ class Facade
         if(!isset($root))
             throw new RuntimeException('Facades are not initialized.');
 
-        return $root->$name(...$arguments);
+        return static::configureRoot($root)->$name(...$arguments);
     }
 
     public static function getFacadeApplication()

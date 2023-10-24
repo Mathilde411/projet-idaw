@@ -1,7 +1,12 @@
 <?php
 
-use App\Model\User;
+use App\Http\Kernel;
 
 $app = require __DIR__ . '/bootstrap/app.php';
 
-echo $app->makeImmediateInjectedCall([\App\Test::class, 'test']);
+$app->start();
+
+$kernel = $app->make(Kernel::class);
+$app->makeImmediateInjectedCall([$kernel, 'handle']);
+
+$app->stop();

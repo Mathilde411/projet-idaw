@@ -13,7 +13,7 @@ class Config
     {}
 
     public function loadConfig(string $rootConfigName) : bool{
-        $configFile = $this->app->getBasePath() . '/config/' . $rootConfigName . '.php';
+        $configFile = $this->app->getBasePath('config/' . $rootConfigName . '.php');
 
         if(!file_exists($configFile))
             return false;

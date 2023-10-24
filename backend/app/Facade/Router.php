@@ -8,4 +8,9 @@ class Router extends Facade
     {
         return \App\Http\Routing\Router::class;
     }
+
+    protected static function configureRoot($root)
+    {
+        return $root->resetVars();
+    }
 }

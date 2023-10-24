@@ -37,6 +37,15 @@ class Application
         $this->setBasePath($basePath);
         $this->setupFirstBindings();
         $this->bootstrap();
+
+    }
+
+    public function start() {
+        $this->bootServiceProviders();
+    }
+
+    public function stop() {
+        $this->shutdownServiceProviders();
     }
 
     public function setBasePath($basePath)
@@ -44,9 +53,9 @@ class Application
         $this->basePath = rtrim($basePath, '\/');
     }
 
-    public function getBasePath()
+    public function getBasePath(string $path = ""): string
     {
-        return $this->basePath;
+        return $this->basePath . '/' . trim($path, '/');
     }
 
 
@@ -103,8 +112,13 @@ class Application
         if(isset($target) and in_array($reflectiveCallParams['type'], ['static', 'method'])) {
             $builder = [$target, $reflectiveCallParams['builder'][1]];
         } elseif ($reflectiveCallParams['type'] == 'method') {
-            $obj = $this->makeImmediateInjectedCall($reflectiveCallParams['builder'][0]);
-            $builder = [$obj, $reflectiveCallParams['builder'][1]];
+            if(is_string($reflectiveCallParams['builder'][0]))
+                $builder = [
+                    $this->makeImmediateInjectedCall($reflectiveCallParams['builder'][0]),
+                    $reflectiveCallParams['builder'][1]
+                ];
+            else
+                $builder = $reflectiveCallParams['builder'];
         } else {
             $builder = $reflectiveCallParams['builder'];
         }
@@ -167,6 +181,20 @@ class Application
             } catch (ReflectionException $e) {
                 continue;
             }
+        }
+    }
+
+    private function bootServiceProviders(): void
+    {
+        foreach ($this->serviceProviders as $provider) {
+            $provider->boot();
+        }
+    }
+
+    private function shutdownServiceProviders(): void
+    {
+        foreach ($this->serviceProviders as $provider) {
+            $provider->boot();
         }
     }
 }

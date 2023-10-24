@@ -11,6 +11,6 @@ class ServiceProvider
     {}
 
     public function register(){}
-    public function up(){}
-    public function down(){}
+    public function boot(){}
+    public function shutdown(){}
 }

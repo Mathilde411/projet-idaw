@@ -17,8 +17,15 @@ class HttpServiceProvider extends ServiceProvider
         $this->app->singleton(Router::class);
     }
 
-    public function up()
+    public function boot()
     {
+        $router = $this->app->make(Router::class);
 
+        $router
+            ->prefix('backend/api')
+            ->group($this->app->getBasePath('routes/api.php'));
+        $router
+            ->prefix('backend')
+            ->group($this->app->getBasePath('routes/web.php'));
     }
 }
