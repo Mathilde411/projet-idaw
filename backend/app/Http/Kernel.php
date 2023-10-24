@@ -9,15 +9,17 @@ use App\Http\Routing\Router;
 class Kernel
 {
     public function __construct(protected Application $app, protected Router $router)
-    {}
+    {
+    }
 
-    public function handle(Request $request, Response $response): void
+    public function handle(Request $request): void
     {
         try {
-            $this->router->route($request);
+            $response = $this->router->route($request);
+            if (!($response instanceof Response))
+                $response = \App\Facade\Response::content($response);
         } catch (HttpError $e) {
-            http_response_code($e->getCode());
-            echo sprintf('
+            $response = \App\Facade\Response::content(sprintf('
             <html lang="fr">
                 <head>
                     <title>Erreur: %s</title>
@@ -27,7 +29,9 @@ class Kernel
                     <p>%s</p>
                 </body>
             </html>
-            ', $e->getTitle(), $e->getCode(), $e->getTitle(), $e->getMessage());
+            ', $e->getTitle(), $e->getCode(), $e->getTitle(), $e->getMessage()), $e->getCode());
         }
+
+        $response->apply();
     }
 }

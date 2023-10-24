@@ -11,6 +11,6 @@ class Test1Controller
     }
 
     public function test2(Request $request, int $id) {
-        echo "test1-2 " . $request->getMethod();
+        return ['a' => $id];
     }
 }

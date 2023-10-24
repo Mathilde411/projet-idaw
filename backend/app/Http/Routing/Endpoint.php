@@ -24,7 +24,7 @@ class Endpoint
         return $this->name;
     }
 
-    public function call($args = []) {
-        $this->app->makeInjectedCall($this->reflectiveCallParam, $args);
+    public function call($args = []) : mixed {
+        return $this->app->makeInjectedCall($this->reflectiveCallParam, $args);
     }
 }

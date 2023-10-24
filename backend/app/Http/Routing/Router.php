@@ -8,6 +8,7 @@ use App\Http\Error\MethodNotAllowedError;
 use App\Http\Error\NotFoundError;
 use App\Http\Request;
 use Closure;
+use TypeError;
 
 class Router
 {
@@ -141,7 +142,7 @@ class Router
      * @throws NotFoundError
      * @throws BadRequestError
      */
-    private function routeByFragmentedPath(array $path, string $method) : void {
+    private function routeByFragmentedPath(array $path, string $method) : mixed {
         $route = $this->root;
 
         /* @var RoutePart $r
@@ -173,11 +174,10 @@ class Router
             $endpointMethod = $endpoint->getMethod();
             if($endpointMethod == $method or $endpointMethod == 'ANY') {
                 try {
-                    $endpoint->call($param);
-                } catch(\TypeError $e) {
+                    return $endpoint->call($param);
+                } catch(TypeError) {
                     throw new BadRequestError();
                 }
-                return;
             }
         }
         throw new MethodNotAllowedError();
@@ -186,18 +186,20 @@ class Router
     /**
      * @throws MethodNotAllowedError
      * @throws NotFoundError
+     * @throws BadRequestError
      */
-    public function routeByPath(string $path, string $method = 'GET') : void {
-        $this->routeByFragmentedPath(explode('/', trim($path, '/')), $method);
+    public function routeByPath(string $path, string $method = 'GET') : mixed {
+        return $this->routeByFragmentedPath(explode('/', trim($path, '/')), $method);
     }
 
     /**
      * @throws MethodNotAllowedError
      * @throws NotFoundError
+     * @throws BadRequestError
      */
-    public function route(Request $request): void
+    public function route(Request $request): mixed
     {
-        $this->routeByFragmentedPath($request->getPathComponents(), $request->getMethod());
+        return $this->routeByFragmentedPath($request->getPathComponents(), $request->getMethod());
     }
 
 
