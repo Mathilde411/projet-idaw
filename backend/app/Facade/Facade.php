@@ -9,13 +9,13 @@ class Facade
 {
     protected static Application $app;
 
-    protected static array $resolved = [];
+    private static array $resolved = [];
 
     protected static function getFacadeBinding(): string {
         throw new RuntimeException('Facade does not implement getFacadeAccessor method.');
     }
 
-    protected static function resolveBinding(string $binding) {
+    private static function resolveBinding(string $binding) {
         if(isset(static::$resolved[$binding]))
             return static::$resolved[$binding];
 
@@ -25,7 +25,7 @@ class Facade
         return null;
     }
 
-    protected static function getFacadeRoot() {
+    private static function getFacadeRoot() {
         return static::resolveBinding(static::getFacadeBinding());
     }
 
@@ -43,13 +43,7 @@ class Facade
         return static::configureRoot($root)->$name(...$arguments);
     }
 
-    public static function getFacadeApplication()
-    {
-        return static::$app;
-    }
-
-
-    public static function setFacadeApplication($app)
+    public static function setFacadeApplication($app): void
     {
         static::$app = $app;
     }

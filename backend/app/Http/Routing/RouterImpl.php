@@ -70,12 +70,14 @@ class RouterImpl implements Router
         $this->resetVars();
     }
 
-    public function resetVars(): void
+    public function resetVars(): static
     {
         $this->pathFragments = [];
         $this->name = null;
         $this->responseType = null;
         $this->middleware = [];
+
+        return $this;
     }
 
     private function stackDown(): void
