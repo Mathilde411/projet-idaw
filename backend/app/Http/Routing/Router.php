@@ -19,6 +19,8 @@ class Router
 
     protected array $pathFragments = [];
     protected ?string $name = null;
+    protected ?string $responseType = null;
+    private array $middleware = [];
 
     public function __construct(protected Application $app)
     {
@@ -29,6 +31,8 @@ class Router
     {
         $this->pathFragments = [];
         $this->name = null;
+        $this->responseType = null;
+        $this->middleware = [];
         return $this;
     }
 
@@ -62,16 +66,40 @@ class Router
         $this->endpoint('ANY', $path, $endpoint);
     }
 
+
+    private function stackUp() {
+        $this->routingStack[] = [
+            'name' => $this->name,
+            'path' => $this->pathFragments,
+            'responseType' => $this->responseType,
+            'middleware' => $this->middleware
+        ];
+
+        $this->resetVars();
+    }
+
+    private function stackDown() {
+        array_pop($this->routingStack);
+    }
+
     public function endpoint(string|array $method, string $path, array|Closure $closure)
     {
         $this->prefix($path);
 
-        $name = $this->name;
+        $name = null;
         $pathFragments = [];
-        foreach ($this->routingStack as $item) {
-            $pathFragments = array_merge($pathFragments, $item['path']);
+        $responseType = '*/*';
+        $middleware = [];
+
+        $this->stackUp();
+        foreach ($this->routingStack as $frame) {
+            $pathFragments = array_merge($pathFragments, $frame['path']);
+            $name = $frame['name'];
+            if(isset($frame['responseType']))
+                $responseType = $frame['responseType'];
+            $middleware = array_merge($middleware, $frame['middleware']);
         }
-        $pathFragments = array_merge($pathFragments, $this->pathFragments);
+        $this->stackDown();
 
         $route = $this->root;
         foreach ($pathFragments as $fragment) {
@@ -82,8 +110,17 @@ class Router
             $method = [$method];
 
         foreach ($method as $m) {
-            $endpoint = new Endpoint($this->app, $m, $name, $closure);
+            $endpoint = new Endpoint(
+                $this->app,
+                $m,
+                $name,
+                $responseType,
+                $middleware,
+                $closure
+            );
+
             $route->addEndpoint($endpoint);
+
             if(isset($name)) {
                 $this->namedEndpoints[$name] = $endpoint;
                 $name = null;
@@ -94,18 +131,14 @@ class Router
 
     public function group(Closure|string $endpoint)
     {
-        $this->routingStack[] = [
-            'name' => $this->name,
-            'path' => $this->pathFragments
-        ];
+        $this->stackUp();
 
-        $this->resetVars();
         if(is_string($endpoint))
             include $endpoint;
         else
             call_user_func($endpoint);
 
-        array_pop($this->routingStack);
+        $this->stackDown();
     }
 
     public function prefix(string $path): static
@@ -117,9 +150,24 @@ class Router
         return $this;
     }
 
+    public function middleware(string|array $middleware): static
+    {
+        if(is_string($middleware))
+            $middleware = [$middleware];
+
+        $this->middleware = array_merge($this->middleware, $middleware);
+        return $this;
+    }
+
     public function name(string $name): static
     {
         $this->name = $name;
+        return $this;
+    }
+
+    public function responseType(string $responseType): static
+    {
+        $this->responseType = $responseType;
         return $this;
     }
 
@@ -167,6 +215,10 @@ class Router
             if(!$found)
                 throw new NotFoundError();
         }
+
+
+        if(empty($route->getEnpoints()))
+            throw new NotFoundError();
 
         /* @var Endpoint $endpoint
          */

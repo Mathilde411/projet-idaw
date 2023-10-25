@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Facade\Config;
 use App\Http\Kernel;
 use App\Http\Request;
 use App\Http\Response;
@@ -20,12 +21,13 @@ class HttpServiceProvider extends ServiceProvider
     public function boot()
     {
         $router = $this->app->make(Router::class);
+        $prefix = Config::get('app.prefix', '');
 
         $router
-            ->prefix('backend/api')
+            ->prefix($prefix . '/api')
             ->group($this->app->getBasePath('routes/api.php'));
         $router
-            ->prefix('backend')
+            ->prefix($prefix)
             ->group($this->app->getBasePath('routes/web.php'));
     }
 }
