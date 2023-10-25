@@ -2,7 +2,7 @@
 
 namespace App\Validation\Rules;
 
-use App\Facade\Database;
+use App\Facade\DBManager;
 use App\Validation\Rules\ValidationRule;
 use App\Validation\ValidationError;
 

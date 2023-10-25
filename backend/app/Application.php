@@ -73,7 +73,7 @@ class Application
         ];
     }
 
-    public function singleton($abstract, $concrete = null)
+    public function singleton(string $abstract, Closure|string|null $concrete = null): void
     {
         $this->bind($abstract, $concrete, true);
     }
@@ -82,7 +82,7 @@ class Application
         return array_key_exists($abstract, $this->bindings);
     }
 
-    public function sharedInstanceExists(string $abstract) : bool {
+    public function instanceExists(string $abstract) : bool {
         return array_key_exists($abstract, $this->sharedInstances);
     }
 
@@ -95,7 +95,7 @@ class Application
         $this->sharedInstances[$abstract] = $instance ?? $this->make($abstract);
     }
 
-    public function makeInjectedCall(array $reflectiveCallParams, array $args = [], mixed $target = null) {
+    public function makeInjectedCall(array $reflectiveCallParams, array $args = [], mixed $target = null) : mixed {
         $fnArgs = [];
         foreach($reflectiveCallParams['parameters'] as $name => $opt) {
             if(isset($args[$name])) {
@@ -138,7 +138,7 @@ class Application
 
         $binding = $this->bindings[$abstract];
 
-        if($binding['shared'] and $this->sharedInstanceExists($abstract))
+        if($binding['shared'] and $this->instanceExists($abstract))
             return $this->sharedInstances[$abstract];
 
         $res = $this->makeInjectedCall($binding['callParam'], $args);
@@ -149,7 +149,8 @@ class Application
         return $res;
     }
 
-    private function setupFirstBindings() {
+    private function setupFirstBindings(): void
+    {
         static::setInstance($this);
         $this->instance('app', $this);
         $this->instance(Application::class, $this);
@@ -159,13 +160,14 @@ class Application
         $this->instance('config', $config);
     }
 
-    private function bootstrap()
+    private function bootstrap(): void
     {
         Facade::setFacadeApplication($this);
         $this->registerServiceProviders();
     }
 
-    private function registerServiceProviders() {
+    private function registerServiceProviders(): void
+    {
         $services = \App\Facade\Config::get('app.services', []);
 
         foreach ($services as $serviceClass) {

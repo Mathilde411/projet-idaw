@@ -23,7 +23,8 @@ class DatabaseManager
             $this->connection->connect(Config::get('database'));
     }
 
-    public function connection() {
+    public function connection(): ?DbConnection
+    {
         return $this->connection;
     }
 }

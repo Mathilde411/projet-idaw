@@ -12,7 +12,7 @@ class Config
     public function __construct(protected Application $app)
     {}
 
-    public function loadConfig(string $rootConfigName) : bool{
+    private function loadConfig(string $rootConfigName) : bool{
         $configFile = $this->app->getBasePath('config/' . $rootConfigName . '.php');
 
         if(!file_exists($configFile))
@@ -22,7 +22,7 @@ class Config
         return true;
     }
 
-    public function get(string $key, mixed $default = null) {
+    public function get(string $key, mixed $default = null) : mixed {
         $components = explode('.', $key);
         if(!isset($cache[$components[0]])) {
             if(!$this->loadConfig($components[0])) {

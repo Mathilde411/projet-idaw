@@ -3,8 +3,12 @@
 namespace App\Facade;
 
 use App\Database\DatabaseManager;
+use App\Database\DbConnection;
 
-class Database extends Facade
+/**
+ * @method static ?DbConnection connection()
+ */
+class DBManager extends Facade
 {
     protected static function getFacadeBinding(): string
     {

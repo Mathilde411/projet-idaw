@@ -2,7 +2,7 @@
 
 namespace App\Validation\Rules;
 
-use App\Facade\Database;
+use App\Facade\DBManager;
 use App\Validation\Rules\ValidationRule;
 use App\Validation\ValidationError;
 
@@ -27,7 +27,7 @@ class DatabaseExistsRule extends ValidationRule
      */
     public function validate(string $var, mixed $value): bool
     {
-        $db = Database::connection();
+        $db = DBManager::connection();
         $sql = static::getSQL($this->table, $this->col);
         $stmt = $db->connection->prepare($sql);
         $stmt->execute(['field' => $value]);

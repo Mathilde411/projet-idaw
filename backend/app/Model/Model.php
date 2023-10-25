@@ -4,7 +4,7 @@ namespace App\Model;
 
 
 use App\Database\DbConnection;
-use App\Facade\Database;
+use App\Facade\DBManager;
 use JsonSerializable;
 use PDO;
 
@@ -37,7 +37,7 @@ class Model implements JsonSerializable
     }
 
     public static function all() {
-        $db = Database::connection();
+        $db = DBManager::connection();
         $sql = static::fetchAllQuery();
         $stmt = $db->connection->prepare($sql);
         $stmt->execute();
@@ -57,7 +57,7 @@ class Model implements JsonSerializable
 
     public function __construct()
     {
-        $this->db = Database::connection();
+        $this->db = DBManager::connection();
     }
 
     public function jsonSerialize(): mixed

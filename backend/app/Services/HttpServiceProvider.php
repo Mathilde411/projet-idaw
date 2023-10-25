@@ -7,6 +7,7 @@ use App\Http\Kernel;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Routing\Router;
+use App\Http\Routing\RouterImpl;
 
 class HttpServiceProvider extends ServiceProvider
 {
@@ -15,7 +16,7 @@ class HttpServiceProvider extends ServiceProvider
         $this->app->singleton(Kernel::class);
         $this->app->singleton(Request::class);
         $this->app->singleton(Response::class);
-        $this->app->singleton(Router::class);
+        $this->app->singleton(Router::class, RouterImpl::class);
     }
 
     public function boot()
