@@ -10,21 +10,26 @@ class DatabaseManager
     protected ?DbConnection $connection = null;
 
     public function __construct(protected Application $app)
+    {}
+
+    private function setupConnection() : void
     {
         $type = Config::get('database.type');
-        if(isset($type)) {
+        if (isset($type)) {
             switch ($type) {
                 case 'mysql':
                     $this->connection = new MySQLConnection();
             }
         }
 
-        if(isset($this->connection))
+        if (isset($this->connection))
             $this->connection->connect(Config::get('database'));
     }
 
-    public function connection(): ?DbConnection
+    public function connection(): DbConnection
     {
+        if(!isset($this->connection))
+            $this->setupConnection();
         return $this->connection;
     }
 }

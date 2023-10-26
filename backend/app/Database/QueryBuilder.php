@@ -3,6 +3,7 @@
 namespace App\Database;
 
 use Closure;
+use PDO;
 use TypeError;
 
 class QueryBuilder
@@ -71,8 +72,24 @@ class QueryBuilder
             throw new TypeError("orWhere receives either a Closure or 2 strings and a value.");
     }
 
-    public function get(array $variables = []) : mixed {
-        return $this->buildSelect($variables)  . ' | ' . print_r($this->param, true);
+    public function get(array $variables = []) : array {
+        $statement = $this
+            ->db->connection()
+            ->connection->prepare($this->buildSelect($variables));
+
+        $statement->execute($this->param);
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function first(array $variables = []) : array {
+        $statement = $this
+            ->db->connection()
+            ->connection->prepare($this->buildSelect($variables));
+
+        $statement->execute($this->param);
+
+        return $statement->fetch(PDO::FETCH_ASSOC);
     }
 
     //----------------------------------------------------------------------------------------------------------------//
@@ -84,35 +101,33 @@ class QueryBuilder
         return ':' . $key;
     }
 
-    private function buildWhereAppendix(array $where = null) : string {
-        if(!isset($where)) {
-            $where = $this->where;
-            $whereKeyword = true;
-        } else {
-            $whereKeyword = false;
-        }
-
-        if(empty($where))
-            return '';
-
-        $res = $whereKeyword ? ' WHERE ' : '';
+    private function buildCondition(array $conditions): string
+    {
+        $res = '';
 
         $first = true;
 
-        foreach ($where as $condition) {
+        foreach ($conditions as $condition) {
             if(!$first)
                 $res .= ($condition['or'] ? ' OR ' : ' AND ');
 
             if(is_string($condition['arg'])) {
                 $res .= $condition['arg'];
             } else {
-                $res .= '(' . $this->buildWhereAppendix($condition['arg']) . ')';
+                $res .= '(' . $this->buildCondition($condition['arg']) . ')';
             }
 
             $first = false;
         }
 
         return $res;
+    }
+
+    private function buildWhereAppendix() : string {
+        if(empty($this->where))
+            return '';
+
+        return ' WHERE ' . $this->buildCondition($this->where);
     }
 
     private function buildSelect(array $variables = []) : string {
