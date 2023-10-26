@@ -2,34 +2,41 @@
 
 namespace App\Database;
 
-use App\Application;
-use App\Facade\Config;
+use App\Config\Config;
+use App\Database\Connection\DbConnection;
+use App\Database\Connection\MySQLConnection;
 
 class DatabaseManager
 {
-    protected ?DbConnection $connection = null;
+    private ?DbConnection $connection = null;
 
-    public function __construct(protected Application $app)
-    {}
-
-    private function setupConnection() : void
+    public function __construct(protected Config $config)
     {
-        $type = Config::get('database.type');
-        if (isset($type)) {
-            switch ($type) {
-                case 'mysql':
-                    $this->connection = new MySQLConnection();
-            }
-        }
-
-        if (isset($this->connection))
-            $this->connection->connect(Config::get('database'));
     }
 
+    /**
+     * @throws DatabaseException
+     */
+    private function setupConnection(): void
+    {
+        $connection = match ($this->config->get('database.type')) {
+            'mysql' => new MySQLConnection(),
+            default => throw new DatabaseException("Le type de base de données n'est pas supporté."),
+        };
+
+        $connection->connect($this->config->get('database'));
+
+        $this->connection = $connection;
+    }
+
+    /**
+     * @throws DatabaseException
+     */
     public function connection(): DbConnection
     {
-        if(!isset($this->connection))
+        if (!isset($this->connection))
             $this->setupConnection();
+
         return $this->connection;
     }
 }

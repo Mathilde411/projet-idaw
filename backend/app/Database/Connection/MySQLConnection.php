@@ -1,14 +1,15 @@
 <?php
 
-namespace App\Database;
+namespace App\Database\Connection;
 
+use App\Database\DatabaseException;
 use PDO;
 use PDOException;
 
 class MySQLConnection extends DbConnection
 {
 
-    public function connect(array $config): bool
+    public function connect(array $config): void
     {
         $connectionString = "mysql:host=". $config['host'];
         if(isset($config['port']))
@@ -22,9 +23,8 @@ class MySQLConnection extends DbConnection
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         }
         catch (PDOException $error) {
-            return false;
+            throw new DatabaseException($error->getMessage(), $error->getCode());
         }
         $this->connection = $pdo;
-        return true;
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Model;
 
 
-use App\Database\DbConnection;
+use App\Database\Connection\DbConnection;
 use App\Facade\DBManager;
 use JsonSerializable;
 use PDO;

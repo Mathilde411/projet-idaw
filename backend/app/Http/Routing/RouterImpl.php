@@ -230,7 +230,7 @@ class RouterImpl implements Router
             if($endpointMethod == $method or $endpointMethod == 'ANY') {
                 try {
                     return $endpoint->call($param);
-                } catch(TypeError) {
+                } catch(TypeError $e) {
                     throw new BadRequestError();
                 }
             }
