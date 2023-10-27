@@ -3,6 +3,7 @@
 namespace App\Http\Error;
 
 use App\Http\Error\HttpError;
+use Throwable;
 
 class ServerError extends HttpError
 {

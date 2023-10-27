@@ -364,18 +364,17 @@ class DbQueryBuilder
 
     private function testSQLIdentifier(string $identifier, bool $throw = false, bool $allowDots = true): bool
     {
+        if(str_contains($identifier, '.') and $allowDots) {
+            foreach (explode('.', $identifier) as $splIdentifier) {
+                $this->testSQLIdentifier($splIdentifier, $throw, false);
+            }
+            return true;
+        }
+
         if ($identifier == '*')
             return true;
 
-        if ($allowDots) {
-            foreach (explode('.', $identifier) as $splIdentifier) {
-                $res = preg_match('#^([[:alpha:]_][[:alnum:]_]*|("[^"]*")+)$#', $splIdentifier);
-            }
-        } else {
-            $res = preg_match('#^([[:alpha:]_][[:alnum:]_]*|("[^"]*")+)$#', $identifier);
-        }
-
-
+        $res = preg_match('#^([[:alpha:]_][[:alnum:]_]*|("[^"]*")+)$#', $identifier);
         if (!$res and $throw)
             throw new QueryBuildingException($identifier . " is not a valid SQL identifier.");
         return $res;

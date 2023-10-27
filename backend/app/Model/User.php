@@ -19,9 +19,8 @@ class User extends Model
         $user->email = $email;
         if(isset($password))
             $user->password = $password;
-        if($user->insert())
-            return $user;
-        return null;
+        $user->insert();
+        return $user;
     }
 
     public function __set(string $name, $value): void

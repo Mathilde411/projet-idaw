@@ -3,11 +3,8 @@
 namespace App\Model;
 
 
-use App\Database\Connection\DbConnection;
-use App\Database\DbQueryBuilder;
 use App\Facade\DB;
 use JsonSerializable;
-use PDO;
 
 class Model implements JsonSerializable
 {
@@ -45,11 +42,9 @@ class Model implements JsonSerializable
             return $o['val'];
         }, $this->data);
 
-        $attr = array_filter($attr, function ($key) {
+        return array_filter($attr, function ($key) {
             return in_array($key, static::$publicAttributes);
         }, ARRAY_FILTER_USE_KEY);
-
-        return $attr;
     }
 
     public function __get(string $name)

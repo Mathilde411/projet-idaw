@@ -2,6 +2,8 @@
 
 namespace App\Http\Error;
 
+use Throwable;
+
 class HttpError extends \Exception
 {
     protected string $title;

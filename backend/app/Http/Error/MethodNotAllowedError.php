@@ -2,6 +2,8 @@
 
 namespace App\Http\Error;
 
+use Throwable;
+
 class MethodNotAllowedError extends HttpError
 {
     public function __construct(string $message = "Méthode de requête non autorisée.", string $title = "Method Not Allowed", int $code = 405, ?Throwable $previous = null)

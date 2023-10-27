@@ -2,7 +2,7 @@
 
 namespace App\Validation\Rules;
 
-use App\Facade\DBManager;
+use App\Facade\DB;
 use App\Validation\Rules\ValidationRule;
 use App\Validation\ValidationError;
 
@@ -25,20 +25,16 @@ class DatabaseExistsRule extends ValidationRule
     /**
      * @throws ValidationError
      */
-    public function validate(string $var, mixed $value): bool
-    {
-        $db = DBManager::connection();
-        $sql = static::getSQL($this->table, $this->col);
-        $stmt = $db->connection->prepare($sql);
-        $stmt->execute(['field' => $value]);
+    public function validate(string $var, mixed $value): bool {
 
-        if($stmt->fetchColumn() == 0)
+        $count = DB::table($this->table)
+            ->where($this->col, $value)
+            ->select(DB::count('*', 'count'))
+            ->first()['count'];
+
+        if($count == 0)
             throw new ValidationError($var . " n'existe pas dans la base de données.");
 
         return true;
-    }
-
-    public static function getSQL(string $table, string $field) : string {
-        return "SELECT COUNT(*) FROM " . $table . " WHERE " . $field . " = :field";
     }
 }

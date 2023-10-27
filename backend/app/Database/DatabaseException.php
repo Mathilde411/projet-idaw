@@ -2,6 +2,8 @@
 
 namespace App\Database;
 
+use Throwable;
+
 class DatabaseException extends \RuntimeException
 {
     protected int|string $sqlCode;
