@@ -2,6 +2,7 @@
 
 namespace App\Database;
 
+use App\Model\Model;
 use Closure;
 use PDO;
 use TypeError;
@@ -16,11 +17,18 @@ class DbQueryBuilder
     private array $groupBy = [];
     private array $orderBy = [];
     private array $select = ['*'];
+    private array $join = [];
 
     private ?int $limit = null;
     private ?int $offset = null;
 
+    private array $insert = [];
+
     private array $param = [];
+    private array $update = [];
+
+    private ?string $wrapperModel;
+    private bool $canWrap = true;
 
 
     public function __construct(protected DatabaseManager $db, private int $paramCount = 0)
@@ -46,34 +54,41 @@ class DbQueryBuilder
         return new RawSQL($raw);
     }
 
-    public function sum(string $identifier): RawSQL
+
+    public function sqlFunction(string $function, string $identifier, ?string $newName = null): RawSQL
     {
         $this->testSQLIdentifier($identifier, true);
-        return new RawSQL('SUM(' . $identifier . ')');
+        $sql = $function . '(' . $identifier . ')';
+        if (isset($newName)) {
+            $this->testSQLIdentifier($newName, true);
+            $sql .= ' AS ' . $newName;
+        }
+        return new RawSQL($sql);
     }
 
-    public function min(string $identifier): RawSQL
+    public function sum(string $identifier, ?string $newName = null): RawSQL
     {
-        $this->testSQLIdentifier($identifier, true);
-        return new RawSQL('MIN(' . $identifier . ')');
+        return $this->sqlFunction('SUM', $identifier, $newName);
     }
 
-    public function max(string $identifier): RawSQL
+    public function min(string $identifier, ?string $newName = null): RawSQL
     {
-        $this->testSQLIdentifier($identifier, true);
-        return new RawSQL('MAX(' . $identifier . ')');
+        return $this->sqlFunction('MIN', $identifier, $newName);
     }
 
-    public function avg(string $identifier): RawSQL
+    public function max(string $identifier, ?string $newName = null): RawSQL
     {
-        $this->testSQLIdentifier($identifier, true);
-        return new RawSQL('AVG(' . $identifier . ')');
+        return $this->sqlFunction('MAX', $identifier, $newName);
     }
 
-    public function count(string $identifier): RawSQL
+    public function avg(string $identifier, ?string $newName = null): RawSQL
     {
-        $this->testSQLIdentifier($identifier, true);
-        return new RawSQL('COUNT(' . $identifier . ')');
+        return $this->sqlFunction('AVG', $identifier, $newName);
+    }
+
+    public function count(string $identifier, ?string $newName = null): RawSQL
+    {
+        return $this->sqlFunction('COUNT', $identifier, $newName);
     }
 
     private function baseWhere(bool $or, bool $not, Closure|string $arg): static
@@ -111,6 +126,7 @@ class DbQueryBuilder
     public function select(string|RawSQL|array $columns): static
     {
         $this->select = $this->extractColumns($columns);
+        $this->canWrap = false;
 
         return $this;
     }
@@ -119,6 +135,7 @@ class DbQueryBuilder
     {
 
         $this->groupBy = $this->extractColumns($columns);
+        $this->canWrap = false;
 
         return $this;
     }
@@ -189,38 +206,176 @@ class DbQueryBuilder
         return $this;
     }
 
-    /**
-     * @throws DatabaseException
-     */
-    public function get(): array
+    private function generalJoin(string $type, string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
-        return $this
-            ->db->connection()
-            ->query($this->buildSelect())
-            ->execute($this->param)
-            ->all();
+        $this->testSQLIdentifier($type, true);
+        $colA = $this->extractColumns($colA)[0];
+        $colB = $this->extractColumns($colB)[0];
+
+        $this->canWrap = false;
+
+        $this->join[] = $type . ' JOIN ' . $table . ' ON ' . $colA . ' ' . $op . ' ' . $colB;
+        return $this;
     }
 
-    /**
-     * @throws DatabaseException
-     */
+    public function join(string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    {
+        return $this->generalJoin('INNER', $table, $colA, $op, $colB);
+    }
+
+    public function leftJoin(string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    {
+        return $this->generalJoin('LEFT', $table, $colA, $op, $colB);
+    }
+
+    public function rightJoin(string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    {
+        return $this->generalJoin('RIGHT', $table, $colA, $op, $colB);
+    }
+
+    public function crossJoin(string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    {
+        return $this->generalJoin('CROSS', $table, $colA, $op, $colB);
+    }
+
+    public function wrapper(string $class, bool $forceWrap = false): static
+    {
+        $this->wrapperModel = $class;
+        if($forceWrap)
+            $this->canWrap = true;
+        return $this;
+    }
+
+    private function wrap(array $data)
+    {
+        if (isset($this->wrapperModel) and $this->canWrap) {
+            /**
+             * @var Model $model
+             */
+            $model = new $this->wrapperModel();
+            $model->setAttributes($data, true);
+            return $model;
+        } else
+            return $data;
+    }
+
+    public function get(): array
+    {
+        return array_map(
+            function (array $data) {
+                return $this->wrap($data);
+            },
+            $this
+                ->db->connection()
+                ->query($this->buildSelect())
+                ->execute($this->param)
+                ->all()
+        );
+    }
+
     public function first(): ?array
     {
-        return $this
+        return $this->wrap($this
             ->db->connection()
             ->query($this->buildSelect())
             ->execute($this->param)
-            ->next();
+            ->next());
+    }
+
+    public function insert(array $data): int
+    {
+        $this->prepareInsert($data);
+        return $this
+            ->db->connection()
+            ->query($this->buildInsert())
+            ->execute($this->param)
+            ->getUpdatedRows();
+    }
+
+    public function insertLastId(array $data): int
+    {
+        $this->prepareInsert($data);
+        return $this
+            ->db->connection()
+            ->query($this->buildInsert())
+            ->execute($this->param)
+            ->getLastId();
+    }
+
+    public function update(array $data): int
+    {
+        $this->prepareUpdate($data);
+        return $this
+            ->db->connection()
+            ->query($this->buildUpdate())
+            ->execute($this->param)
+            ->getLastId();
+    }
+
+    public function delete(): int
+    {
+        return $this
+            ->db->connection()
+            ->query($this->buildDelete())
+            ->execute($this->param)
+            ->getUpdatedRows();
     }
 
     //----------------------------------------------------------------------------------------------------------------//
 
-    private function testSQLIdentifier(string $identifier, bool $throw = false): bool
+    private function prepareInsert(array $data)
+    {
+        if (count($data) == 0 or !is_array($data[0]))
+            $data = [$data];
+
+        $set = [];
+        foreach ($data as $field) {
+            foreach (array_keys($field) as $key) {
+                $set[$key] = true;
+            }
+        }
+
+        foreach (array_keys($set) as $key) {
+            $this->testSQLIdentifier($key, true);
+        }
+        $this->insert['keys'] = array_keys($set);
+        $this->insert['data'] = [];
+
+        foreach ($data as $field) {
+            $obj = [];
+            foreach (array_keys($set) as $key) {
+                $obj[$key] = ($field[$key] ?? null);
+            }
+            $this->insert['data'][] = $obj;
+        }
+
+    }
+
+    private function prepareUpdate(array $data): void
+    {
+
+        foreach (array_keys($data) as $key) {
+            $this->testSQLIdentifier($key, true);
+        }
+
+        $this->update = $data;
+
+    }
+
+    private function testSQLIdentifier(string $identifier, bool $throw = false, bool $allowDots = true): bool
     {
         if ($identifier == '*')
             return true;
 
-        $res = preg_match('#^([[:alpha:]_][[:alnum:]_]*|("[^"]*")+)$#', $identifier);
+        if ($allowDots) {
+            foreach (explode('.', $identifier) as $splIdentifier) {
+                $res = preg_match('#^([[:alpha:]_][[:alnum:]_]*|("[^"]*")+)$#', $splIdentifier);
+            }
+        } else {
+            $res = preg_match('#^([[:alpha:]_][[:alnum:]_]*|("[^"]*")+)$#', $identifier);
+        }
+
+
         if (!$res and $throw)
             throw new QueryBuildingException($identifier . " is not a valid SQL identifier.");
         return $res;
@@ -311,6 +466,14 @@ class DbQueryBuilder
         return $res;
     }
 
+    private function buildJoinAppendix(): string
+    {
+        if (empty($this->join))
+            return '';
+
+        return ' ' . implode(' ', $this->join);
+    }
+
     private function buildWhereAppendix(): string
     {
         if (empty($this->where))
@@ -359,18 +522,55 @@ class DbQueryBuilder
         return ' OFFSET ' . $this->offset;
     }
 
-    private function buildSelect(array $variables = []): string
+    private function buildSelect(): string
     {
         return 'SELECT '
             . implode(', ', $this->select)
             . ' FROM '
             . $this->table
+            . $this->buildJoinAppendix()
             . $this->buildWhereAppendix()
             . $this->buildGroupByAppendix()
             . $this->buildHavingAppendix()
             . $this->buildOrderByAppendix()
             . $this->buildLimit()
             . $this->buildOffset()
+            . ';';
+    }
+
+    private function buildDelete(): string
+    {
+        return 'DELETE FROM '
+            . $this->table
+            . $this->buildWhereAppendix()
+            . ';';
+    }
+
+    private function buildInsert(): string
+    {
+        return 'INSERT INTO '
+            . $this->table
+            . ' (' . implode(', ', $this->insert['keys']) . ')'
+            . ' VALUES '
+            . implode(', ', array_map(function (array $data) {
+                $res = [];
+                foreach ($this->insert['keys'] as $key) {
+                    $res[] = $this->assignParam($data[$key]);
+                }
+                return '(' . implode(', ', $res) . ')';
+            }, $this->insert['data']))
+            . ';';
+    }
+
+    private function buildUpdate(): string
+    {
+        return 'UPDATE '
+            . $this->table
+            . ' SET '
+            . implode(', ', array_map(function (string $key) {
+                return $key . ' = ' . $this->assignParam($this->update[$key]);
+            }, array_keys($this->update)))
+            . $this->buildWhereAppendix()
             . ';';
     }
 }

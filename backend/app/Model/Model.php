@@ -4,7 +4,8 @@ namespace App\Model;
 
 
 use App\Database\Connection\DbConnection;
-use App\Facade\DBManager;
+use App\Database\DbQueryBuilder;
+use App\Facade\DB;
 use JsonSerializable;
 use PDO;
 
@@ -15,14 +16,9 @@ class Model implements JsonSerializable
     protected static array $publicAttributes = [];
     protected static string $table;
 
-    public static function get(mixed $id): ?static
+    public static function find(mixed $id): ?static
     {
-        $model = new static();
-        $model->__set(static::$primaryKey, $id);
-
-        if ($model->fetch())
-            return $model;
-        return null;
+        return static::where(static::$primaryKey, $id)->first();
     }
 
     public static function create(array $data): ?static
@@ -31,34 +27,17 @@ class Model implements JsonSerializable
 
         $model->setAttributes($data);
 
-        if ($model->insert())
-            return $model;
-        return null;
+        $model->insert();
+
+        return $model;
     }
 
-    public static function all() {
-        $db = DBManager::connection();
-        $sql = static::fetchAllQuery();
-        $stmt = $db->connection->prepare($sql);
-        $stmt->execute();
-
-        $ret = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $res = [];
-        foreach ($ret as $data) {
-            $model = new static();
-            $model->setAttributes($data, true);
-            $res[] = $model;
-        }
-        return $res;
+    public static function all()
+    {
+        return static::get();
     }
 
     private array $data = [];
-    private ?DbConnection $db;
-
-    public function __construct()
-    {
-        $this->db = DBManager::connection();
-    }
 
     public function jsonSerialize(): mixed
     {
@@ -96,7 +75,8 @@ class Model implements JsonSerializable
         unset($this->data[$name]);
     }
 
-    public function setAttributes(array $data, bool $sync = false) {
+    public function setAttributes(array $data, bool $sync = false)
+    {
         foreach ($data as $key => $val) {
             $this->data[$key] = [
                 'val' => $val,
@@ -105,135 +85,52 @@ class Model implements JsonSerializable
         }
     }
 
-    public function fetch(): bool
+    public function fetch(): void
     {
-        $sql = $this->fetchQuery();
-        $stmt = $this->db->connection->prepare($sql);
-        $stmt->execute([static::$primaryKey => $this->data[static::$primaryKey]['val']]);
+        $pk = static::$primaryKey;
+        $this->setAttributes(DB::table(static::$table)->where($pk, $this->$pk)->first(), true);
+    }
 
-        if ($stmt->rowCount() == 0)
-            return false;
+    public function insert(): void
+    {
+        $data = array_map(function ($o) {
+            return $o['val'];
+        }, $this->data);
+        $pk = DB::table(static::$table)->insertLastId($data);
 
-        $res = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        foreach ($res as $attr => $val) {
-            $this->data[$attr] = [
-                'val' => $val,
+        if ($pk != 0)
+            $this->data[static::$primaryKey] = [
+                'val' => $pk,
                 'sync' => true
             ];
-        }
-        return true;
+
+        $this->fetch();
     }
 
-    public function insert(): bool
+    public function update(): void
     {
-        $sql = $this->insertQuery();
-        $stmt = $this->db->connection->prepare($sql);
-        if (!$stmt->execute(array_map(function ($o) {
+        $data = array_map(function ($o) {
             return $o['val'];
-        }, $this->data)))
-            return false;
+        }, array_filter($this->data, function ($val) {
+            return !$val['sync'];
+        }));
 
-        if (($lastId = $this->db->connection->lastInsertId()) != 0)
-            $this->__set(static::$primaryKey, $lastId);
+        if (count($data) == 0)
+            return;
 
-        foreach ($this->data as $attr => $val) {
-            $this->data[$attr]['sync'] = true;
-        }
+        DB::table(static::$table)->update($data);
 
-        return true;
+        $this->fetch();
     }
 
-    public function update(): bool
+    public function delete(): void
     {
-        $toUpdate = array_filter($this->data, function ($val) { return !$val['sync'];});
-
-        if(count($toUpdate) == 0)
-            return true;
-
-        $sql = $this->updateQuery(array_keys($toUpdate));
-        $stmt = $this->db->connection->prepare($sql);
-
-        $param = array_map(function ($o) {
-            return $o['val'];
-        }, $toUpdate);
-
-        $param[static::$primaryKey] = $this->__get(static::$primaryKey);
-
-        if (!$stmt->execute($param))
-            return false;
-
-        foreach ($toUpdate as $attr => $val) {
-            $this->data[$attr]['sync'] = true;
-        }
-
-        return true;
+        $pk = static::$primaryKey;
+        DB::table(static::$table)->where($pk, $this->$pk)->delete();
     }
 
-    public function delete(): bool
+    public static function __callStatic(string $name, array $arguments): mixed
     {
-        $sql = $this->deleteQuery();
-        $stmt = $this->db->connection->prepare($sql);
-
-        if (!$stmt->execute([static::$primaryKey => $this->data[static::$primaryKey]['val']]))
-            return false;
-
-        $this->data = [];
-
-        return true;
+        return DB::table(static::$table)->wrapper(static::class)->$name(...$arguments);
     }
-
-    // REQUESTS
-
-    private function fetchQuery(): string
-    {
-        return "SELECT * FROM " .
-            static::$table .
-            " WHERE " .
-            static::$primaryKey .
-            " = :" .
-            static::$primaryKey;
-    }
-
-    private static function fetchAllQuery(): string
-    {
-        return "SELECT * FROM " .
-            static::$table;
-    }
-
-    private function insertQuery(): string
-    {
-        return "INSERT INTO " .
-            static::$table .
-            " (" . implode(', ', array_keys($this->data)) . ") " .
-            "VALUES (" . implode(', ', array_map(function ($s) {
-                return ':' . $s;
-            }, array_keys($this->data))) . ");";
-
-    }
-
-    private function updateQuery(array $attributes): string
-    {
-        return "UPDATE " .
-            static::$table . " SET " .
-            implode(', ', array_map(function ($s) {
-                return $s . ' = :' . $s;
-            }, $attributes)) . " WHERE " .
-            static::$primaryKey .
-            " = :" .
-            static::$primaryKey;
-
-    }
-
-    private function deleteQuery(): string
-    {
-        return "DELETE FROM " .
-            static::$table .
-            " WHERE " .
-            static::$primaryKey .
-            " = :" .
-            static::$primaryKey;
-    }
-
-
 }

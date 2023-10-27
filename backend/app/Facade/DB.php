@@ -10,11 +10,11 @@ use Closure;
  * @method static DbQueryBuilder table(string $table)
  * @method static bool transaction(Closure $closure)
  * @method static RawSQL raw(string $sql)
- * @method static RawSQL min(string $identifier)
- * @method static RawSQL max(string $identifier)
- * @method static RawSQL sum(string $identifier)
- * @method static RawSQL avg(string $identifier)
- * @method static RawSQL count(string $identifier)
+ * @method static RawSQL min(string $identifier, ?string $newName = null)
+ * @method static RawSQL max(string $identifier, ?string $newName = null)
+ * @method static RawSQL sum(string $identifier, ?string $newName = null)
+ * @method static RawSQL avg(string $identifier, ?string $newName = null)
+ * @method static RawSQL count(string $identifier, ?string $newName = null)
  */
 class DB extends Facade
 {
