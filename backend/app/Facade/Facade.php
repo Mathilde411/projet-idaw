@@ -16,13 +16,7 @@ class Facade
     }
 
     private static function resolveBinding(string $binding) {
-        if(isset(static::$resolved[$binding]))
-            return static::$resolved[$binding];
-
-        if(isset(static::$app)) {
-            return static::$resolved[$binding] = static::$app->make($binding);
-        }
-        return null;
+        return static::$app->make($binding);
     }
 
     private static function getFacadeRoot() {

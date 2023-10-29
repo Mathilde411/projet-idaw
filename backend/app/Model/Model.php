@@ -4,6 +4,11 @@ namespace App\Model;
 
 
 use App\Facade\DB;
+use App\Model\Relationships\BelongsToMany;
+use App\Model\Relationships\BelongsToOne;
+use App\Model\Relationships\HasMany;
+use App\Model\Relationships\HasOne;
+use App\Model\Relationships\Relationship;
 use JsonSerializable;
 
 class Model implements JsonSerializable
@@ -47,9 +52,46 @@ class Model implements JsonSerializable
         }, ARRAY_FILTER_USE_KEY);
     }
 
+    protected function hasOne(string $relationClass, string $foreignKey, ?string $localKey = null) : HasOne{
+        if(!isset($localKey))
+            $localKey = static::$primaryKey;
+
+        return new HasOne($this, static::class, $relationClass, $localKey, $foreignKey);
+    }
+
+    protected function hasMany(string $relationClass, string $foreignKey, ?string $localKey = null) : HasMany{
+        if(!isset($localKey))
+            $localKey = static::$primaryKey;
+
+        return new HasMany($this, static::class, $relationClass, $localKey, $foreignKey);
+    }
+
+    protected function belongsTo(string $relationClass, string $foreignKey, ?string $localKey = null) : BelongsToOne {
+        if(!isset($localKey))
+            $localKey = $relationClass::$primaryKey;
+
+        return new BelongsToOne($this, static::class, $relationClass, $foreignKey, $localKey);
+    }
+
+    protected function belongsToMany(string $relationClass, string $middleTable, string $selfForeignKey, string $relationForeignKey, ?string $selfLocalKey = null, ?string $relationLocalKey = null) : BelongsToMany
+    {
+        if(!isset($relationLocalKey))
+            $relationLocalKey = $relationClass::$primaryKey;
+
+        if(!isset($selfLocalKey))
+            $selfLocalKey = static::$primaryKey;
+
+        return new BelongsToMany($this, static::class, $relationClass, $middleTable, $selfLocalKey, $relationLocalKey, $selfForeignKey, $relationForeignKey);
+    }
+
     public function __get(string $name)
     {
-        return isset($this->data[$name]) ? $this->data[$name]['val'] : null;
+        if(isset($this->data[$name])) {
+            return $this->data[$name]['val'];
+        } elseif(method_exists($this, $name) and (($rel = $this->$name()) instanceof Relationship)) {
+            return $rel->execute();
+        }
+        return null;
     }
 
     public function __set(string $name, $value): void
@@ -128,4 +170,21 @@ class Model implements JsonSerializable
     {
         return DB::table(static::$table)->wrapper(static::class)->$name(...$arguments);
     }
+
+    public static function getPrimaryKey(): string
+    {
+        return static::$primaryKey;
+    }
+
+    public static function getPublicAttributes(): array
+    {
+        return static::$publicAttributes;
+    }
+
+    public static function getTable(): string
+    {
+        return static::$table;
+    }
+
+
 }

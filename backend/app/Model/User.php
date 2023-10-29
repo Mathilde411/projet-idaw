@@ -23,6 +23,26 @@ class User extends Model
         return $user;
     }
 
+    public function consos(): Relationships\HasMany
+    {
+        return $this->hasMany(Conso::class, 'user_id');
+    }
+
+    public function repas(): Relationships\BelongsToMany
+    {
+        return $this->belongsToMany(Repas::class, 'users_repas', 'user_id', 'repas_id');
+    }
+
+    public function parents(): Relationships\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'parents', 'infant_id', 'elder_id');
+    }
+
+    public function children(): Relationships\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'parents', 'elder_id', 'infant_id');
+    }
+
     public function __set(string $name, $value): void
     {
         if($name == "password")

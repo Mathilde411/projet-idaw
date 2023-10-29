@@ -33,11 +33,17 @@ class DbQueryBuilder
 
     public function __construct(protected DatabaseManager $db, private int $paramCount = 0)
     {
+        array_map(null, []);
     }
 
-    public function table(string $table): static
+    public function table(string|RawSQL $table): static
     {
-        $this->table = $table;
+        if($table instanceof RawSQL)
+            $this->table = $table->raw;
+        else {
+            $this->testSQLIdentifier($table, true);
+            $this->table = $table;
+        }
         return $this;
     }
 
@@ -206,9 +212,13 @@ class DbQueryBuilder
         return $this;
     }
 
-    private function generalJoin(string $type, string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    private function generalJoin(string $type, string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
-        $this->testSQLIdentifier($type, true);
+        if($table instanceof RawSQL)
+            $table = $table->raw;
+        else
+            $this->testSQLIdentifier($table, true);
+
         $colA = $this->extractColumns($colA)[0];
         $colB = $this->extractColumns($colB)[0];
 
@@ -218,22 +228,22 @@ class DbQueryBuilder
         return $this;
     }
 
-    public function join(string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    public function join(string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
         return $this->generalJoin('INNER', $table, $colA, $op, $colB);
     }
 
-    public function leftJoin(string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    public function leftJoin(string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
         return $this->generalJoin('LEFT', $table, $colA, $op, $colB);
     }
 
-    public function rightJoin(string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    public function rightJoin(string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
         return $this->generalJoin('RIGHT', $table, $colA, $op, $colB);
     }
 
-    public function crossJoin(string $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    public function crossJoin(string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
         return $this->generalJoin('CROSS', $table, $colA, $op, $colB);
     }
@@ -246,9 +256,9 @@ class DbQueryBuilder
         return $this;
     }
 
-    private function wrap(array $data)
+    private function wrap(?array $data)
     {
-        if (isset($this->wrapperModel) and $this->canWrap) {
+        if (isset($data) and isset($this->wrapperModel) and $this->canWrap) {
             /**
              * @var Model $model
              */
@@ -273,7 +283,7 @@ class DbQueryBuilder
         );
     }
 
-    public function first(): ?array
+    public function first(): mixed
     {
         return $this->wrap($this
             ->db->connection()
