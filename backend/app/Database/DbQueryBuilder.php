@@ -7,7 +7,7 @@ use Closure;
 use PDO;
 use TypeError;
 
-class DbQueryBuilder
+class DbQueryBuilder implements QueryProvider
 {
 
     private string $table;
@@ -36,8 +36,11 @@ class DbQueryBuilder
         array_map(null, []);
     }
 
-    public function table(string|RawSQL $table): static
+    public function table(string|RawSQL|QueryProvider $table): static
     {
+        if($table instanceof QueryProvider)
+            $table = $this->fuseSubQuery($table);
+
         if($table instanceof RawSQL)
             $this->table = $table->raw;
         else {
@@ -109,22 +112,22 @@ class DbQueryBuilder
         return $this;
     }
 
-    public function where(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): static
+    public function where(RawSQL|Closure|string|QueryProvider $var, mixed $op = null, mixed $value = null): static
     {
         return $this->baseWhere(false, false, $this->parseCondition($var, $op, $value));
     }
 
-    public function orWhere(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): static
+    public function orWhere(RawSQL|Closure|string|QueryProvider $var, mixed $op = null, mixed $value = null): static
     {
         return $this->baseWhere(true, false, $this->parseCondition($var, $op, $value));
     }
 
-    public function whereNot(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): static
+    public function whereNot(RawSQL|Closure|string|QueryProvider $var, mixed $op = null, mixed $value = null): static
     {
         return $this->baseWhere(false, true, $this->parseCondition($var, $op, $value));
     }
 
-    public function orWhereNot(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): static
+    public function orWhereNot(RawSQL|Closure|string|QueryProvider $var, mixed $op = null, mixed $value = null): static
     {
         return $this->baseWhere(true, true, $this->parseCondition($var, $op, $value));
     }
@@ -158,22 +161,22 @@ class DbQueryBuilder
         return $this;
     }
 
-    public function having(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): static
+    public function having(RawSQL|Closure|string|QueryProvider $var, mixed $op = null, mixed $value = null): static
     {
         return $this->baseHaving(false, false, $this->parseCondition($var, $op, $value));
     }
 
-    public function orHaving(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): static
+    public function orHaving(RawSQL|Closure|string|QueryProvider $var, mixed $op = null, mixed $value = null): static
     {
         return $this->baseHaving(true, false, $this->parseCondition($var, $op, $value));
     }
 
-    public function havingNot(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): static
+    public function havingNot(RawSQL|Closure|string|QueryProvider $var, mixed $op = null, mixed $value = null): static
     {
         return $this->baseHaving(false, true, $this->parseCondition($var, $op, $value));
     }
 
-    public function orHavingNot(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): static
+    public function orHavingNot(RawSQL|Closure|string|QueryProvider $var, mixed $op = null, mixed $value = null): static
     {
         return $this->baseHaving(true, true, $this->parseCondition($var, $op, $value));
     }
@@ -212,8 +215,11 @@ class DbQueryBuilder
         return $this;
     }
 
-    private function generalJoin(string $type, string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    private function generalJoin(string $type, string|RawSQL|QueryProvider $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
+        if($table instanceof QueryProvider)
+            $table = $this->fuseSubQuery($table);
+
         if($table instanceof RawSQL)
             $table = $table->raw;
         else
@@ -228,22 +234,22 @@ class DbQueryBuilder
         return $this;
     }
 
-    public function join(string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    public function join(string|RawSQL|QueryProvider $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
         return $this->generalJoin('INNER', $table, $colA, $op, $colB);
     }
 
-    public function leftJoin(string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    public function leftJoin(string|RawSQL|QueryProvider $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
         return $this->generalJoin('LEFT', $table, $colA, $op, $colB);
     }
 
-    public function rightJoin(string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    public function rightJoin(string|RawSQL|QueryProvider $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
         return $this->generalJoin('RIGHT', $table, $colA, $op, $colB);
     }
 
-    public function crossJoin(string|RawSQL $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
+    public function crossJoin(string|RawSQL|QueryProvider $table, string|RawSQL $colA, string $op, string|RawSQL $colB): static
     {
         return $this->generalJoin('CROSS', $table, $colA, $op, $colB);
     }
@@ -423,25 +429,39 @@ class DbQueryBuilder
         return $arg;
     }
 
-    private function parseCondition(RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): Closure|string
+    private function parseConditionValue(mixed $value): string
+    {
+        if($value instanceof QueryProvider)
+            return $this->fuseSubQuery($value)->raw;
+        return $this->assignParam($value);
+    }
+
+    private function parseCondition(QueryProvider|Closure|string $var, mixed $op = null, mixed $value = null): Closure|string
     {
         if ($var instanceof Closure)
             return $var;
-        elseif ($var instanceof RawSQL)
+
+        if($var instanceof QueryProvider)
+            $var = $this->fuseSubQuery($var);
+
+        if ($var instanceof RawSQL) {
             if (isset($op)) {
                 if (isset($value))
-                    return $var->raw . ' ' . $op . ' ' . $this->assignParam($value);
+                    return $var->raw . ' ' . $op . ' ' . $this->parseConditionValue($value);
                 else
-                    return $var->raw . ' = ' . $this->assignParam($op);
+                    return $var->raw . ' = ' . $this->parseConditionValue($op);
             } else
                 return $var->raw;
-        elseif (isset($op) and $this->testSQLIdentifier($var, true)) {
+        }
+
+        if (isset($op) and $this->testSQLIdentifier($var, true)) {
             if (isset($value))
-                return $var . ' ' . $op . ' ' . $this->assignParam($value);
+                return $var . ' ' . $op . ' ' . $this->parseConditionValue($value);
             else
-                return $var . ' = ' . $this->assignParam($op);
-        } else
-            throw new QueryBuildingException("The condition is not built properly.");
+                return $var . ' = ' . $this->parseConditionValue($op);
+        }
+
+        throw new QueryBuildingException("The condition is not built properly.");
     }
 
     private function assignParam(mixed $value): string
@@ -531,7 +551,7 @@ class DbQueryBuilder
         return ' OFFSET ' . $this->offset;
     }
 
-    private function buildSelect(): string
+    private function buildSelect(bool $ending = true): string
     {
         return 'SELECT '
             . implode(', ', $this->select)
@@ -544,7 +564,7 @@ class DbQueryBuilder
             . $this->buildOrderByAppendix()
             . $this->buildLimit()
             . $this->buildOffset()
-            . ';';
+            . ($ending ? ';' : '');
     }
 
     private function buildDelete(): string
@@ -582,5 +602,28 @@ class DbQueryBuilder
             . $this->buildWhereAppendix()
             . ';';
     }
+
+    public function getQuery() : DbQueryBuilder
+    {
+        return $this;
+    }
+
+    private function fuseSubQuery(SubQuery|QueryProvider $query): RawSQL
+    {
+        if($query instanceof QueryProvider)
+            $query = $this->extractSubQuery($query);
+
+        $this->paramCount = $query->reIndex($this->paramCount);
+        $this->param = array_merge($this->param, $query->getParam());
+        return $query->getRaw();
+    }
+
+    private function extractSubQuery(QueryProvider $provider): SubQuery
+    {
+        $query = $provider->getQuery();
+        return new SubQuery($query->buildSelect(false), $query->param);
+    }
+
+
 }
 
