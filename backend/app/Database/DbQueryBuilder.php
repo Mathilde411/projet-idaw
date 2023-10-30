@@ -38,12 +38,13 @@ class DbQueryBuilder implements QueryProvider
 
     public function table(string|RawSQL|QueryProvider $table): static
     {
-        if($table instanceof QueryProvider)
-            $table = $this->fuseSubQuery($table);
-
-        if($table instanceof RawSQL)
+        if($table instanceof QueryProvider) {
+            $sub = $this->extractSubQuery($table);
+            $this->table = $this->fuseSubQuery($sub)->raw . ' table_' . substr(str_shuffle(MD5(microtime())), 0, 4);
+            $this->wrapperModel = $sub->getWraper();
+        } elseif($table instanceof RawSQL) {
             $this->table = $table->raw;
-        else {
+        } else {
             $this->testSQLIdentifier($table, true);
             $this->table = $table;
         }
@@ -436,7 +437,7 @@ class DbQueryBuilder implements QueryProvider
         return $this->assignParam($value);
     }
 
-    private function parseCondition(QueryProvider|Closure|string $var, mixed $op = null, mixed $value = null): Closure|string
+    private function parseCondition(QueryProvider|RawSQL|Closure|string $var, mixed $op = null, mixed $value = null): Closure|string
     {
         if ($var instanceof Closure)
             return $var;
@@ -621,7 +622,7 @@ class DbQueryBuilder implements QueryProvider
     private function extractSubQuery(QueryProvider $provider): SubQuery
     {
         $query = $provider->getQuery();
-        return new SubQuery($query->buildSelect(false), $query->param);
+        return new SubQuery($query->buildSelect(false), $query->param, ($query->canWrap and isset($query->wrapperModel)) ? $query->wrapperModel:null);
     }
 
 

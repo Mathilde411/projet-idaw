@@ -3,11 +3,12 @@
 namespace App\Facade;
 
 use App\Database\DbQueryBuilder;
+use App\Database\QueryProvider;
 use App\Database\RawSQL;
 use Closure;
 
 /**
- * @method static DbQueryBuilder table(string|RawSQL $table)
+ * @method static DbQueryBuilder table(string|RawSQL|QueryProvider $table)
  * @method static bool transaction(Closure $closure)
  * @method static RawSQL raw(string $sql)
  * @method static RawSQL min(string $identifier, ?string $newName = null)

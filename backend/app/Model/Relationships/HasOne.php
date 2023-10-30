@@ -34,7 +34,7 @@ class HasOne extends Relationship
         $this->relationForeignKey = $relationForeignKey;
     }
 
-    protected function prepareBaseQuery(): DbQueryBuilder
+    public function getQuery(): DbQueryBuilder
     {
         $pk = ($this->selfClass)::getPrimaryKey();
         return DB::table(DB::raw($this->selfTable . ' AS left_table'))
@@ -46,6 +46,6 @@ class HasOne extends Relationship
 
     public function execute(): mixed
     {
-        return $this->prepareBaseQuery()->first();
+        return $this->getQuery()->first();
     }
 }

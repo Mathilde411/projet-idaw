@@ -9,6 +9,6 @@ class HasMany extends HasOne
 {
     public function execute(): array
     {
-        return $this->prepareBaseQuery()->get();
+        return $this->getQuery()->get();
     }
 }

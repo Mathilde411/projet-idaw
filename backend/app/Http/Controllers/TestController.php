@@ -10,8 +10,8 @@ use App\Model\User;
 
 class TestController
 {
-    public function test(Request $request) {
-        $user = User::find(3);
-        return $user?->parents;
+    public function test(Request $request)
+    {
+        return User::find(4)->parents()->get();
     }
 }

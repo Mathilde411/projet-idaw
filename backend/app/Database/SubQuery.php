@@ -6,11 +6,13 @@ class SubQuery
 {
     private string $raw;
     private array $param;
+    private ?string $wraper;
 
-    public function __construct(string $raw, array $param)
+    public function __construct(string $raw, array $param, ?string $wraper)
     {
         $this->raw = $raw;
         $this->param = $param;
+        $this->wraper = $wraper;
     }
 
     public function reIndex(int $start): int
@@ -36,6 +38,11 @@ class SubQuery
     public function getParam(): array
     {
         return $this->param;
+    }
+
+    public function getWraper(): ?string
+    {
+        return $this->wraper;
     }
 
 
