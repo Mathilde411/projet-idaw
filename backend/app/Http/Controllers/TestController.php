@@ -12,6 +12,13 @@ class TestController
 {
     public function test(Request $request)
     {
-        return User::find(4)->parents()->get();
+        $jean = User::create([
+            'name' => 'Jean',
+            'email' => 'jean@jean.fr'
+        ]);
+
+        $jean->parents()->link(User::find(1), ['boo' => 'Mère']);
+        $jean->parents()->link(User::find(3), ['boo' => 'Père']);
+        return $jean->parents;
     }
 }

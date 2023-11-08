@@ -16,6 +16,7 @@ class Model implements JsonSerializable
     protected static string $primaryKey = 'id';
 
     protected static array $publicAttributes = [];
+    protected static array $hooks = [];
     protected static string $table;
 
     public static function find(mixed $id): ?static
@@ -87,7 +88,12 @@ class Model implements JsonSerializable
     public function __get(string $name)
     {
         if(isset($this->data[$name])) {
-            return $this->data[$name]['val'];
+            $val = $this->data[$name]['val'];
+            if(isset(static::$hooks) and isset(static::$hooks['get'])) {
+                return static::$hooks['get']($val);
+            } else {
+                return $val;
+            }
         } elseif(method_exists($this, $name) and (($rel = $this->$name()) instanceof Relationship)) {
             return $rel->execute();
         }
@@ -97,7 +103,7 @@ class Model implements JsonSerializable
     public function __set(string $name, $value): void
     {
         $this->data[$name] = [
-            'val' => $value,
+            'val' => (isset(static::$hooks) and isset(static::$hooks['set'])) ? static::$hooks['set']($value) : $value,
             'sync' => false
         ];
     }

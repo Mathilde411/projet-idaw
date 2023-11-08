@@ -2,9 +2,9 @@
 
 namespace App\Model\Relationships;
 
-use App\Database\DbQueryBuilder;
 use App\Database\QueryProvider;
 use App\Facade\DB;
+use App\Model\Model;
 
 abstract class Relationship implements QueryProvider
 {
@@ -14,4 +14,6 @@ abstract class Relationship implements QueryProvider
     {
         return DB::table($this->getQuery())->$name(...$arguments);
     }
+
+    public abstract function link(Model $relationInstance, array $arguments = []);
 }

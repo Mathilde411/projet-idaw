@@ -4,12 +4,13 @@ namespace App\Model\Relationships;
 
 use App\Database\DbQueryBuilder;
 use App\Facade\DB;
+use App\Model\Model;
 
 class HasOne extends Relationship
 {
 
     // Instance
-    private mixed $instance;
+    private Model $instance;
 
     // Classes
     private string $selfClass;
@@ -23,7 +24,7 @@ class HasOne extends Relationship
     private string $selfPrimaryKey;
     private string $relationForeignKey;
 
-    public function __construct(mixed $instance, string $selfClass, string $relationClass, string $selfPrimaryKey, string $relationForeignKey)
+    public function __construct(Model $instance, string $selfClass, string $relationClass, string $selfPrimaryKey, string $relationForeignKey)
     {
         $this->instance = $instance;
         $this->selfClass = $selfClass;
@@ -47,5 +48,13 @@ class HasOne extends Relationship
     public function execute(): mixed
     {
         return $this->getQuery()->first();
+    }
+
+    public function link(Model $relationInstance, array $arguments = [])
+    {
+        $fk = $this->relationForeignKey;
+        $pk = $this->selfPrimaryKey;
+        $relationInstance->$fk = $this->instance->$pk;
+        $relationInstance->update();
     }
 }

@@ -4,12 +4,13 @@ namespace App\Model\Relationships;
 
 use App\Database\DbQueryBuilder;
 use App\Facade\DB;
+use App\Model\Model;
 use App\Model\Relationships\Relationship;
 
 class BelongsToOne extends Relationship
 {
     // Instance
-    private mixed $instance;
+    private Model $instance;
 
     // Classes
     private string $selfClass;
@@ -23,7 +24,7 @@ class BelongsToOne extends Relationship
     private string $selfForeignKey;
     private string $relationPrimaryKey;
 
-    public function __construct(mixed $instance, string $selfClass, string $relationClass, string $selfForeignKey, string $relationPrimaryKey)
+    public function __construct(Model $instance, string $selfClass, string $relationClass, string $selfForeignKey, string $relationPrimaryKey)
     {
         $this->instance = $instance;
         $this->selfClass = $selfClass;
@@ -47,5 +48,13 @@ class BelongsToOne extends Relationship
     public function execute(): mixed
     {
         return $this->getQuery()->first();
+    }
+
+    public function link(Model $relationInstance, array $arguments = [])
+    {
+        $fk = $this->selfForeignKey;
+        $pk = $this->relationPrimaryKey;
+        $this->instance->$fk = $relationInstance->$pk;
+        $this->instance->update();
     }
 }
